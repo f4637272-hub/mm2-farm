@@ -171,12 +171,12 @@ local function checkKey(key)
             return { StatusCode = 200, Body = game:HttpPost(CONFIG.checkURL, body, "application/json") }
         end
     end)
-    if not ok or not response then return false, "Сервер недоступен" end
-    if response.StatusCode ~= 200 then return false, "Неверный ключ" end
+    if not ok or not response then return false, "Сервер недоступен (спит?)" end
+    if response.StatusCode ~= 200 then return false, "Неверный ключ (Код: " .. tostring(response.StatusCode) .. ")" end
     return true, "OK"
 end
 
--- ===== ОКНО КЛЮЧА =====
+-- ===== ОКНО КЛЮЧА (ИСПРАВЛЕНО) =====
 local function promptKey(callback)
     local gui = Instance.new("ScreenGui")
     gui.Name = "KeyGui"; gui.ResetOnSpawn = false; gui.Parent = LP:WaitForChild("PlayerGui")
@@ -204,8 +204,22 @@ local function promptKey(callback)
     box.Font = WindUI.Font; box.BorderSizePixel = 0; box.Parent = f
     Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
 
-    local btn = WindUI.CreateButton(f, "Проверить", false)
-    btn.Size = UDim2.new(0, 260, 0, 35); btn.Position = UDim2.new(0, 20, 0, 110)
+    -- Кнопка с жесткими размерами, чтобы точно влезла
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 260, 0, 35) 
+    btn.Position = UDim2.new(0, 20, 0, 110)
+    btn.BackgroundColor3 = WindUI.Accent
+    btn.TextColor3 = Color3.fromRGB(20, 20, 20)
+    btn.Font = WindUI.FontBold; btn.TextSize = 14; btn.Text = "Проверить"
+    btn.BorderSizePixel = 0; btn.AutoButtonColor = false; btn.Parent = f
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(180, 245, 120)}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = WindUI.Accent}):Play()
+    end)
 
     local st = Instance.new("TextLabel")
     st.Size = UDim2.new(0, 260, 0, 20); st.Position = UDim2.new(0, 20, 0, 150)
