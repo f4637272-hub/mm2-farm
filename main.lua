@@ -1,5 +1,5 @@
 -- =============================================
--- ПОЛНЫЙ СКРИПТ MM2 CANDY FARM + KEY SYSTEM
+-- ПОЛНЫЙ СКРИПТ MM2 CANDY FARM + FAST TP
 -- Автор: @BaysentaScript
 -- =============================================
 
@@ -14,10 +14,9 @@ local CONFIG = {
     checkURL = "https://nbpanel-api.onrender.com/v1/licenses/verify"
 }
 
--- Глобальные настройки
 getgenv().AutoFarm = false
 getgenv().AntiAFK = false
-getgenv().FarmSpeed = 0.5
+getgenv().FarmSpeed = 0 -- 0 = максимальная скорость (без задержек)
 
 -- =============================================
 -- СИСТЕМА ПРОВЕРКИ КЛЮЧА (KEY SYSTEM)
@@ -77,7 +76,7 @@ local function startScript()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.DisplayOrder = 20
 
-    -- Основной фрейм (увеличили высоту до 200, чтобы влез тег)
+    -- Основной фрейм
     MainFrame.Parent = ScreenGui
     MainFrame.Size = UDim2.new(0, 220, 0, 200)
     MainFrame.Position = UDim2.new(0, 10, 0, 10)
@@ -85,16 +84,14 @@ local function startScript()
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Draggable = true
-    
-    local corner = Instance.new("UICorner", MainFrame)
-    corner.CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
     -- Заголовок
     Title.Parent = MainFrame
     Title.Size = UDim2.new(1, 0, 0, 25)
     Title.Position = UDim2.new(0, 0, 0, 5)
     Title.BackgroundTransparency = 1
-    Title.Text = "🎮 MM2 Auto Farm"
+    Title.Text = "🎮 MM2 Fast TP Farm"
     Title.Font = Enum.Font.GothamBold
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.TextSize = 16
@@ -106,7 +103,7 @@ local function startScript()
     TgTag.BackgroundTransparency = 1
     TgTag.Text = "TGK: @BaysentaScript"
     TgTag.Font = Enum.Font.Gotham
-    TgTag.TextColor3 = Color3.fromRGB(120, 180, 255) -- Голубой цвет
+    TgTag.TextColor3 = Color3.fromRGB(120, 180, 255)
     TgTag.TextSize = 12
 
     -- Статус
@@ -123,7 +120,7 @@ local function startScript()
     AutoFarmBtn.Size = UDim2.new(0.8, 0, 0, 45)
     AutoFarmBtn.Position = UDim2.new(0.1, 0, 0.25, 0)
     AutoFarmBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    AutoFarmBtn.Text = "🚜 Авто-фарм: ВЫКЛ"
+    AutoFarmBtn.Text = "🚜 ТП-Фарм: ВЫКЛ"
     AutoFarmBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     AutoFarmBtn.Font = Enum.Font.GothamBold
     AutoFarmBtn.TextSize = 14
@@ -144,14 +141,14 @@ local function startScript()
     AutoFarmBtn.MouseButton1Click:Connect(function()
         getgenv().AutoFarm = not getgenv().AutoFarm
         if getgenv().AutoFarm then
-            AutoFarmBtn.Text = "🚜 Авто-фарм: ВКЛ"
+            AutoFarmBtn.Text = "🚜 ТП-Фарм: ВКЛ"
             AutoFarmBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
-            Status.Text = "Авто-фарм активирован!"
-            startFarm()
+            Status.Text = "Быстрый ТП-фарм запущен!"
+            startFastFarm()
         else
-            AutoFarmBtn.Text = "🚜 Авто-фарм: ВЫКЛ"
+            AutoFarmBtn.Text = "🚜 ТП-Фарм: ВЫКЛ"
             AutoFarmBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-            Status.Text = "Авто-фарм остановлен"
+            Status.Text = "ТП-фарм остановлен"
         end
     end)
 
@@ -169,12 +166,12 @@ local function startScript()
         end
     end)
 
-    -- ФУНКЦИИ ФАРМА
+    -- СЛУЖЕБНЫЕ ФУНКЦИИ
     function notify(msg)
         Status.Text = msg
         task.wait(3)
         if getgenv().AutoFarm then
-            Status.Text = "Фармим конфеты..."
+            Status.Text = "Сканируем и собираем..."
         else
             Status.Text = "Готов к работе"
         end
@@ -187,74 +184,68 @@ local function startScript()
                LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     end
 
-    function findCandies()
-        local candies = {}
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("Part") and (obj.Name:lower():find("candy") or obj.Name:lower():find("halloween")) then
-                if isAlive() then
-                    local distance = (LocalPlayer.Character.HumanoidRootPart.Position - obj.Position).Magnitude
-                    if distance < 200 then
-                        table.insert(candies, obj)
-                    end
-                end
-            end
-        end
-        return candies
-    end
-
-    function collectCandy(candy)
-        if not isAlive() then return false end
-        
-        -- Телепорт к конфете
-        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(candy.Position + Vector3.new(0, 3, 0))
-        task.wait(0.1)
-        
-        -- Сбор конфеты (обернуто в pcall на случай если исполнитель не поддерживает)
-        if candy and candy.Parent then
-            pcall(function()
-                firetouchinterest(LocalPlayer.Character.HumanoidRootPart, candy, 0)
-                task.wait(0.05)
-                firetouchinterest(LocalPlayer.Character.HumanoidRootPart, candy, 1)
-            end)
-            return true
-        end
-        return false
-    end
-
-    function startFarm()
+    -- =============================================
+    -- БЫСТРЫЙ ТП-ФАРМ
+    -- =============================================
+    function startFastFarm()
         task.spawn(function()
             while getgenv().AutoFarm do
                 if not isAlive() then
-                    notify("Персонаж мертв, ждем...")
                     LocalPlayer.CharacterAdded:Wait()
-                    task.wait(3)
+                    task.wait(1)
                 end
                 
-                local candies = findCandies()
-                if #candies > 0 then
-                    local collected = 0
-                    for i, candy in pairs(candies) do
-                        if not getgenv().AutoFarm then break end
-                        if collectCandy(candy) then
-                            collected = collected + 1
+                local candiesFound = 0
+                
+                -- Сканируем ВСЁ пространство мгновенно
+                for _, obj in pairs(Workspace:GetDescendants()) do
+                    if not getgenv().AutoFarm then break end
+                    
+                    -- Ищем конфеты (Part или Model)
+                    if (obj:IsA("BasePart") or obj:IsA("Model")) and (obj.Name:lower():find("candy") or obj.Name:lower():find("halloween")) then
+                        
+                        local targetPos
+                        if obj:IsA("Model") then
+                            if obj.PrimaryPart then targetPos = obj.PrimaryPart.Position
+                            elseif obj:FindFirstChild("Handle") then targetPos = obj.Handle.Position
+                            else
+                                for _, p in pairs(obj:GetDescendants()) do
+                                    if p:IsA("BasePart") then targetPos = p.Position break end
+                                end
+                            end
+                        elseif obj:IsA("BasePart") then
+                            targetPos = obj.Position
                         end
-                        task.wait(getgenv().FarmSpeed)
+
+                        if targetPos then
+                            -- Мгновенный телепорт к конфете
+                            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0))
+                            
+                            -- Мгновенное касание (сбор)
+                            pcall(function()
+                                firetouchinterest(LocalPlayer.Character.HumanoidRootPart, obj, 0)
+                                task.wait(0.01) -- микро-задержка для сервера
+                                firetouchinterest(LocalPlayer.Character.HumanoidRootPart, obj, 1)
+                            end)
+                            
+                            candiesFound = candiesFound + 1
+                            
+                            -- Если конфет много, делаем крошечную паузу, чтобы не крашнуло игру
+                            if candiesFound % 10 == 0 then
+                                task.wait(0.05)
+                            end
+                        end
                     end
-                    notify("Собрано: " .. collected)
-                else
-                    -- Двигаемся случайно если конфет нет
-                    local randomPos = Vector3.new(
-                        math.random(-50, 50),
-                        20,
-                        math.random(-50, 50)
-                    )
-                    if isAlive() then
-                        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(randomPos)
-                    end
-                    notify("Ищем конфеты...")
                 end
                 
-                task.wait(1)
+                if candiesFound > 0 then
+                    Status.Text = "Собрано за проход: " .. candiesFound
+                else
+                    Status.Text = "Ищем конфеты..."
+                    task.wait(0.5) -- Ждем спавна новых
+                end
+                
+                task.wait(0.1) -- Пауза перед следующим сканированием
             end
         end)
     end
@@ -264,7 +255,6 @@ local function startScript()
         task.spawn(function()
             while getgenv().AntiAFK do
                 if isAlive() then
-                    -- Движение вперед-назад
                     VirtualInputManager:SendKeyEvent(true, "W", false, game)
                     task.wait(0.5)
                     VirtualInputManager:SendKeyEvent(false, "W", false, game)
@@ -273,13 +263,12 @@ local function startScript()
                     task.wait(0.5)
                     VirtualInputManager:SendKeyEvent(false, "S", false, game)
                     
-                    -- Поворот камеры
                     local cam = workspace.CurrentCamera
                     if cam then
                         cam.CFrame = cam.CFrame * CFrame.Angles(0, math.rad(45), 0)
                     end
                 end
-                task.wait(25) -- Ждем 25 секунд
+                task.wait(25)
             end
         end)
     end
@@ -288,14 +277,11 @@ local function startScript()
     LocalPlayer.CharacterAdded:Connect(function()
         task.wait(3)
         if getgenv().AutoFarm then
-            notify("Персонаж зареспавнился!")
+            notify("Респавн. Продолжаем фарм!")
         end
     end)
 
-    -- УВЕДОМЛЕНИЕ О ЗАГРУЗКЕ
     notify("Скрипт загружен! 🎮")
-    print("🎮 MM2 Auto Farm загружен! Автор: @BaysentaScript")
-
 end
 
 -- =============================================
@@ -349,10 +335,10 @@ local function promptKey(callback)
             st.TextColor3 = Color3.fromRGB(155, 225, 93); st.Text = "Успешно!"
             task.wait(0.3)
             
-            callback() -- Запускаем главный скрипт
+            callback()
             task.wait(0.1)
             
-            gui.Enabled = false -- Скрываем окно ключа
+            gui.Enabled = false
         else
             st.TextColor3 = Color3.fromRGB(255, 90, 90); st.Text = "Ошибка: " .. tostring(msg)
         end
