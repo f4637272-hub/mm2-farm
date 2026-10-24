@@ -1,26 +1,25 @@
--- MM2 Candy Autofarm + Key System + GUI + Fly/NoClip
+-- MM2 Candy Autofarm + Key System + GUI + Fly/NoClip (Optimized)
 -- Исполнитель: Delta / Fluxus / Arceus X / Synapse / KRNL
 
 local Players     = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local VirtualUser = game:GetService("VirtualUser")
-local LP          = Players.LocalPlayer
 local RunService  = game:GetService("RunService")
 local UIS         = game:GetService("UserInputService")
+local LP          = Players.LocalPlayer
 
 -- ================= НАСТРОЙКИ =================
 local CONFIG = {
     checkURL   = "https://nbpanel-api.onrender.com/v1/licenses/verify",
-    loopDelay  = 0.4,
-    touchWait  = 0.15,
+    loopDelay  = 0.2,        -- Пауза между поисками цели
+    touchWait  = 0.25,       -- Пауза после подлета (чтобы сервер засчитал касание)
     itemFilter = {"Candy", "Treat", "Coin", "Gift"}, 
-    progressEvery = 20,
-    flySpeed   = 45,  -- Скорость полета (оптимально 40-60)
-    noClip     = true -- Выключать коллизию со стенами
+    flySpeed   = 50,         -- Скорость полета
+    noClip     = true        -- Проходить сквозь стены
 }
 -- ==============================================
 
--- ===== KEY CHECK =====
+-- ===== KEY CHECK (FastAPI) =====
 local function checkKey(key)
     if not key or key == "" then return false, "Введите ключ" end
     local body = HttpService:JSONEncode({ key = key })
@@ -32,72 +31,9 @@ local function checkKey(key)
             return { StatusCode = 200, Body = game:HttpPost(CONFIG.checkURL, body, "application/json") }
         end
     end)
-    if not ok or not response then return false, "Сервер недоступен" end
-    if response.StatusCode ~= 200 then return false, "Неверный ключ" end
+    if not ok or not response then return false, "Сервер недоступен (спит?)" end
+    if response.StatusCode ~= 200 then return false, "Неверный ключ (Код: " .. tostring(response.StatusCode) .. ")" end
     return true, "OK"
-end
-
--- ===== ГЛАВНЫЙ GUI (Появляется после ключа) =====
-local function createMainGUI()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "MM2Farm_GUI"; gui.ResetOnSpawn = false
-    gui.Parent = LP:WaitForChild("PlayerGui")
-
-    local f = Instance.new("Frame")
-    f.Size = UDim2.new(0, 260, 0, 160); f.Position = UDim2.new(0, 20, 0, 20)
-    f.BackgroundColor3 = Color3.fromRGB(25, 25, 28); f.BorderSizePixel = 0
-    f.Active = true; f.Parent = gui
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
-
-    -- Перетаскивание
-    local dragging, dragInput, dragStart, startPos
-    f.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; dragStart = input.Position; startPos = f.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
-        end
-    end)
-    f.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    UIS.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            f.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-
-    -- Заголовок
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 30); title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundTransparency = 1; title.Text = "MM2 Farm [v1.1]"
-    title.TextColor3 = Color3.fromRGB(155, 225, 93); title.Font = Enum.Font.GothamBold; title.TextSize = 16; title.Parent = f
-
-    -- Счётчик
-    local counter = Instance.new("TextLabel")
-    counter.Size = UDim2.new(1, 0, 0, 30); counter.Position = UDim2.new(0, 0, 0, 40)
-    counter.BackgroundTransparency = 1; counter.Text = "Собрано конфет: 0"
-    counter.TextColor3 = Color3.fromRGB(240, 240, 240); counter.Font = Enum.Font.Gotham; counter.TextSize = 15; counter.Parent = f
-
-    -- Кнопка Start
-    local btnStart = Instance.new("TextButton")
-    btnStart.Size = UDim2.new(0, 110, 0, 30); btnStart.Position = UDim2.new(0, 20, 0, 100)
-    btnStart.Text = "Старт"; btnStart.Font = Enum.Font.GothamBold; btnStart.TextSize = 14
-    btnStart.BackgroundColor3 = Color3.fromRGB(155, 225, 93); btnStart.TextColor3 = Color3.fromRGB(20, 20, 20); btnStart.Parent = f
-    Instance.new("UICorner", btnStart).CornerRadius = UDim.new(0, 4)
-
-    -- Кнопка Stop
-    local btnStop = Instance.new("TextButton")
-    btnStop.Size = UDim2.new(0, 110, 0, 30); btnStop.Position = UDim2.new(0, 130, 0, 100)
-    btnStop.Text = "Стоп"; btnStop.Font = Enum.Font.GothamBold; btnStop.TextSize = 14
-    btnStop.BackgroundColor3 = Color3.fromRGB(255, 90, 90); btnStop.TextColor3 = Color3.fromRGB(20, 20, 20); btnStop.Parent = f
-    Instance.new("UICorner", btnStop).CornerRadius = UDim.new(0, 4)
-
-    return f, counter, btnStart, btnStop
 end
 
 -- ===== ОКНО КЛЮЧА =====
@@ -144,10 +80,68 @@ local function promptKey(callback)
     end)
 end
 
--- ===== ФИЗИКА И ФАРМ =====
+-- ===== ГЛАВНЫЙ GUI =====
+local function createMainGUI()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "MM2Farm_GUI"; gui.ResetOnSpawn = false; gui.Parent = LP:WaitForChild("PlayerGui")
+
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(0, 260, 0, 160); f.Position = UDim2.new(0, 20, 0, 20)
+    f.BackgroundColor3 = Color3.fromRGB(25, 25, 28); f.BorderSizePixel = 0
+    f.Active = true; f.Parent = gui
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
+
+    -- Перетаскивание
+    local dragging, dragInput, dragStart, startPos
+    f.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = f.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    f.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            f.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 30); title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1; title.Text = "MM2 Farm [v1.2]"
+    title.TextColor3 = Color3.fromRGB(155, 225, 93); title.Font = Enum.Font.GothamBold; title.TextSize = 16; title.Parent = f
+
+    local counter = Instance.new("TextLabel")
+    counter.Size = UDim2.new(1, 0, 0, 30); counter.Position = UDim2.new(0, 0, 0, 40)
+    counter.BackgroundTransparency = 1; counter.Text = "Собрано конфет: 0"
+    counter.TextColor3 = Color3.fromRGB(240, 240, 240); counter.Font = Enum.Font.Gotham; counter.TextSize = 15; counter.Parent = f
+
+    local btnStart = Instance.new("TextButton")
+    btnStart.Size = UDim2.new(0, 110, 0, 30); btnStart.Position = UDim2.new(0, 20, 0, 100)
+    btnStart.Text = "Старт"; btnStart.Font = Enum.Font.GothamBold; btnStart.TextSize = 14
+    btnStart.BackgroundColor3 = Color3.fromRGB(155, 225, 93); btnStart.TextColor3 = Color3.fromRGB(20, 20, 20); btnStart.Parent = f
+    Instance.new("UICorner", btnStart).CornerRadius = UDim.new(0, 4)
+
+    local btnStop = Instance.new("TextButton")
+    btnStop.Size = UDim2.new(0, 110, 0, 30); btnStop.Position = UDim2.new(0, 130, 0, 100)
+    btnStop.Text = "Стоп"; btnStop.Font = Enum.Font.GothamBold; btnStop.TextSize = 14
+    btnStop.BackgroundColor3 = Color3.fromRGB(255, 90, 90); btnStop.TextColor3 = Color3.fromRGB(20, 20, 20); btnStop.Parent = f
+    Instance.new("UICorner", btnStop).CornerRadius = UDim.new(0, 4)
+
+    return f, counter, btnStart, btnStop
+end
+
+-- ===== ФИЗИКА И ПОИСК =====
 local running = false
-local flyConnection = nil
-local noclipConnection = nil
+local currentTarget = nil
+local flyBV, flyConn, noclipConn = nil, nil, nil
 
 local function getClosestItem()
     local h = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
@@ -167,59 +161,107 @@ local function getClosestItem()
     return closest
 end
 
-local function startFly(targetPart)
+local function ensureFly()
+    if flyBV and flyBV.Parent then return end
     local char = LP.Character or LP.CharacterAdded:Wait()
     local hrp = char:WaitForChild("HumanoidRootPart")
     
-    if flyConnection then flyConnection:Disconnect() end
-    local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.zero
-    bv.Parent = hrp
-    
-    flyConnection = RunService.Heartbeat:Connect(function()
-        if not running or not targetPart or not targetPart.Parent then
-            bv.Velocity = Vector3.zero
+    flyBV = Instance.new("BodyVelocity")
+    flyBV.Name = "MM2FarmFly"
+    flyBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    flyBV.Velocity = Vector3.zero
+    flyBV.P = 0
+    flyBV.Parent = hrp
+
+    if flyConn then flyConn:Disconnect() end
+    flyConn = RunService.Heartbeat:Connect(function()
+        if not running or not flyBV or not flyBV.Parent then
+            if flyBV then flyBV.Velocity = Vector3.zero end
             return
         end
-        local direction = (targetPart.Position - hrp.Position).Unit
-        bv.Velocity = direction * CONFIG.flySpeed
+        local target = currentTarget
+        local char2 = LP.Character
+        local h = char2 and char2:FindFirstChild("HumanoidRootPart")
+        
+        if not h or not target or not target.Parent then
+            flyBV.Velocity = Vector3.zero
+            return
+        end
+        
+        local diff = target.Position - h.Position
+        local dist = diff.Magnitude
+        
+        if dist < 3.5 then
+            flyBV.Velocity = Vector3.zero
+        else
+            -- Плавное торможение у цели
+            local speed = math.min(CONFIG.flySpeed, dist * 5)
+            flyBV.Velocity = diff.Unit * speed
+        end
     end)
-    
-    return function() -- StopFly
-        if flyConnection then flyConnection:Disconnect() end
-        if bv then bv:Destroy() end
+end
+
+local function stopFly()
+    if flyConn then flyConn:Disconnect(); flyConn = nil end
+    if flyBV then flyBV:Destroy(); flyBV = nil end
+    local char = LP.Character
+    local h = char and char:FindFirstChild("HumanoidRootPart")
+    if h then h.AssemblyLinearVelocity = Vector3.zero end
+end
+
+local function enableNoClip()
+    if not CONFIG.noClip or noclipConn then return end
+    noclipConn = RunService.Stepped:Connect(function()
+        local char = LP.Character
+        if char then
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
+            end
+        end
+    end)
+end
+
+local function disableNoClip()
+    if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
+    local char = LP.Character
+    if char then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = true end
+        end
     end
 end
 
+-- ===== ОСНОВНОЙ ЦИКЛ =====
 local function startFarm(counterLabel)
     if running then return end
     running = true
     local count = 0
-    local char = LP.Character or LP.CharacterAdded:Wait()
-    
-    -- NoClip
-    if CONFIG.noClip then
-        noclipConnection = RunService.Stepped:Connect(function()
-            if char then
-                for _, v in pairs(char:GetDescendants()) do
-                    if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
-                end
-            end
-        end)
-    end
+    ensureFly()
+    enableNoClip()
 
     task.spawn(function()
         while running do
             local target = getClosestItem()
+            currentTarget = target
+            
             if target then
-                local stopFly = startFly(target)
-                task.wait(CONFIG.touchWait)
-                stopFly()
-                count = count + 1
-                counterLabel.Text = "Собрано конфет: " .. count
+                -- Ждём подлёта
+                local t0 = tick()
+                while running and target and target.Parent do
+                    local h = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+                    if not h then break end
+                    if (h.Position - target.Position).Magnitude < 3.5 then break end
+                    if tick() - t0 > 3 then break end
+                    task.wait(0.05)
+                end
+                
+                if running then
+                    count = count + 1
+                    if counterLabel then counterLabel.Text = "Собрано конфет: " .. count end
+                end
+                task.wait(CONFIG.touchWait) -- Даем серверу время засчитать
             else
-                task.wait(1)
+                task.wait(0.6)
             end
             task.wait(CONFIG.loopDelay)
         end
@@ -228,14 +270,9 @@ end
 
 local function stopFarm()
     running = false
-    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
-    if noclipConnection then noclipConnection:Disconnect(); noclipConnection = nil end
-    local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        for _, v in pairs(LP.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = true end
-        end
-    end
+    currentTarget = nil
+    stopFly()
+    disableNoClip()
 end
 
 -- Анти-AFK
