@@ -29,7 +29,7 @@ local WindUI = {
     BgTrans     = 0.05,
     StrokeColor = Color3.fromRGB(45, 45, 50),
     TextColor   = Color3.fromRGB(240, 240, 240),
-    Accent      = Color3.fromRGB(155, 225, 93), -- Твой неоновый лайм
+    Accent      = Color3.fromRGB(155, 225, 93), 
     Danger      = Color3.fromRGB(255, 80, 80),
     Font        = Enum.Font.GothamMedium,
     FontBold    = Enum.Font.GothamBold,
@@ -37,6 +37,7 @@ local WindUI = {
     CreateWindow = function(titleText)
         local gui = Instance.new("ScreenGui")
         gui.Name = "MM2_WindUI"; gui.ResetOnSpawn = false
+        gui.DisplayOrder = 20 -- Главное окно поверх всего
         gui.Parent = LP:WaitForChild("PlayerGui")
         
         local main = Instance.new("Frame")
@@ -54,11 +55,11 @@ local WindUI = {
         title.TextColor3 = WindUI.TextColor; title.Font = WindUI.FontBold; title.TextSize = 16
         title.TextXAlignment = Enum.TextXAlignment.Left; title.Parent = main
         
-        -- ТВОЙ ТЕЛЕГРАМ ТЕГ
+        -- ТЕЛЕГРАМ ТЕГ
         local tgTag = Instance.new("TextLabel")
         tgTag.Size = UDim2.new(1, -40, 0, 15); tgTag.Position = UDim2.new(0, 20, 0, 32)
         tgTag.BackgroundTransparency = 1; tgTag.Text = "TGK: @BaysentaScript"
-        tgTag.TextColor3 = Color3.fromRGB(120, 180, 255); -- Голубой цвет для ссылки
+        tgTag.TextColor3 = Color3.fromRGB(120, 180, 255)
         tgTag.Font = WindUI.Font; tgTag.TextSize = 12
         tgTag.TextXAlignment = Enum.TextXAlignment.Left; tgTag.Parent = main
         
@@ -159,7 +160,7 @@ local WindUI = {
     end
 }
 
--- ===== KEY CHECK =====
+-- ===== KEY CHECK (FastAPI) =====
 local function checkKey(key)
     if not key or key == "" then return false, "Введите ключ" end
     local body = HttpService:JSONEncode({ key = key })
@@ -171,15 +172,16 @@ local function checkKey(key)
             return { StatusCode = 200, Body = game:HttpPost(CONFIG.checkURL, body, "application/json") }
         end
     end)
-    if not ok or not response then return false, "Сервер недоступен (спит?)" end
+    if not ok or not response then return false, "Сервер недоступен" end
     if response.StatusCode ~= 200 then return false, "Неверный ключ (Код: " .. tostring(response.StatusCode) .. ")" end
     return true, "OK"
 end
 
--- ===== ОКНО КЛЮЧА (ИСПРАВЛЕНО) =====
+-- ===== ОКНО КЛЮЧА =====
 local function promptKey(callback)
     local gui = Instance.new("ScreenGui")
-    gui.Name = "KeyGui"; gui.ResetOnSpawn = false; gui.Parent = LP:WaitForChild("PlayerGui")
+    gui.Name = "KeyGui"; gui.ResetOnSpawn = false; gui.DisplayOrder = 10
+    gui.Parent = LP:WaitForChild("PlayerGui")
     
     local f = Instance.new("Frame")
     f.Size = UDim2.new(0, 300, 0, 180); f.Position = UDim2.new(0.5, -150, 0.5, -90)
@@ -204,7 +206,6 @@ local function promptKey(callback)
     box.Font = WindUI.Font; box.BorderSizePixel = 0; box.Parent = f
     Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
 
-    -- Кнопка с жесткими размерами, чтобы точно влезла
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 260, 0, 35) 
     btn.Position = UDim2.new(0, 20, 0, 110)
@@ -230,7 +231,10 @@ local function promptKey(callback)
         local ok, msg = checkKey(box.Text)
         if ok then
             st.TextColor3 = WindUI.Accent; st.Text = "Успешно!"
-            task.wait(0.4); gui:Destroy(); callback()
+            task.wait(0.3)
+            callback() -- Создаем главное окно
+            task.wait(0.1) -- Даем время прогрузиться
+            gui:Destroy() -- Удаляем окно ключа
         else
             st.TextColor3 = WindUI.Danger; st.Text = "Ошибка: " .. tostring(msg)
         end
@@ -343,15 +347,21 @@ local function doFling()
     end
 end
 
+-- ===== ПОЛЕТ И NOCLIP (ИСПРАВЛЕНО ОТ ВЫЛЕТОВ) =====
 local function ensureFly()
-    if flyBV and flyBV.Parent then return end
-    local char = LP.Character or LP.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart")
+    local char = LP.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if flyBV and flyBV.Parent == hrp then return end
+
+    if flyConn then flyConn:Disconnect() end
+    if flyBV then flyBV:Destroy() end
+
     flyBV = Instance.new("BodyVelocity")
     flyBV.Name = "MM2FarmFly"; flyBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     flyBV.Velocity = Vector3.zero; flyBV.P = 0; flyBV.Parent = hrp
 
-    if flyConn then flyConn:Disconnect() end
     flyConn = RunService.Heartbeat:Connect(function()
         if not running or not flyBV or not flyBV.Parent then
             if flyBV then flyBV.Velocity = Vector3.zero end
@@ -399,28 +409,33 @@ local function startFarm(counterLabel, statusLabel)
     statusLabel.Text = "Статус: Работает"
     statusLabel.TextColor3 = WindUI.Accent
     local count = 0
-    ensureFly(); enableNoClip()
+    enableNoClip()
 
     task.spawn(function()
         while running do
-            local target = getClosestItem()
-            currentTarget = target
-            if target then
-                local t0 = tick()
-                while running and target and target.Parent do
-                    local h = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-                    local pos = getTargetPos(target)
-                    if not h or not pos or (h.Position - pos).Magnitude < 2.5 or tick() - t0 > 3 then break end
-                    task.wait(0.01)
-                end
-                if running then
-                    count = count + 1
-                    counterLabel.Text = "Собрано: " .. count
-                    if CONFIG.enableFling and count >= CONFIG.maxCandy then doFling(); count = 0 end
-                end
-                task.wait(CONFIG.touchWait) 
+            if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then
+                task.wait(1) -- Ждем респавна
             else
-                task.wait(0.3)
+                ensureFly() -- Проверяем полет (восстановит после смерти)
+                local target = getClosestItem()
+                currentTarget = target
+                if target then
+                    local t0 = tick()
+                    while running and target and target.Parent do
+                        local h = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+                        local pos = getTargetPos(target)
+                        if not h or not pos or (h.Position - pos).Magnitude < 2.5 or tick() - t0 > 3 then break end
+                        task.wait(0.01)
+                    end
+                    if running then
+                        count = count + 1
+                        counterLabel.Text = "Собрано: " .. count
+                        if CONFIG.enableFling and count >= CONFIG.maxCandy then doFling(); count = 0 end
+                    end
+                    task.wait(CONFIG.touchWait) 
+                else
+                    task.wait(0.3)
+                end
             end
             task.wait(CONFIG.loopDelay)
         end
