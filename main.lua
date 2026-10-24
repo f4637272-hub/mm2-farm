@@ -1,4 +1,4 @@
--- MM2 Candy Autofarm + WindUI + Fling + Auto-Search
+ -- MM2 Candy Autofarm + WindUI + Fling + Auto-Search
 -- Автор: TGK @BaysentaScript
 -- Исполнитель: Delta / Fluxus / Arceus X / Synapse / KRNL
 
@@ -37,7 +37,7 @@ local WindUI = {
     CreateWindow = function(titleText)
         local gui = Instance.new("ScreenGui")
         gui.Name = "MM2_WindUI"; gui.ResetOnSpawn = false
-        gui.DisplayOrder = 20 -- Главное окно поверх всего
+        gui.DisplayOrder = 20
         gui.Parent = LP:WaitForChild("PlayerGui")
         
         local main = Instance.new("Frame")
@@ -55,7 +55,6 @@ local WindUI = {
         title.TextColor3 = WindUI.TextColor; title.Font = WindUI.FontBold; title.TextSize = 16
         title.TextXAlignment = Enum.TextXAlignment.Left; title.Parent = main
         
-        -- ТЕЛЕГРАМ ТЕГ
         local tgTag = Instance.new("TextLabel")
         tgTag.Size = UDim2.new(1, -40, 0, 15); tgTag.Position = UDim2.new(0, 20, 0, 32)
         tgTag.BackgroundTransparency = 1; tgTag.Text = "TGK: @BaysentaScript"
@@ -177,7 +176,7 @@ local function checkKey(key)
     return true, "OK"
 end
 
--- ===== ОКНО КЛЮЧА =====
+-- ===== ОКНО КЛЮЧА (БЕЗ DESTROY) =====
 local function promptKey(callback)
     local gui = Instance.new("ScreenGui")
     gui.Name = "KeyGui"; gui.ResetOnSpawn = false; gui.DisplayOrder = 10
@@ -232,9 +231,13 @@ local function promptKey(callback)
         if ok then
             st.TextColor3 = WindUI.Accent; st.Text = "Успешно!"
             task.wait(0.3)
+            
             callback() -- Создаем главное окно
-            task.wait(0.1) -- Даем время прогрузиться
-            gui:Destroy() -- Удаляем окно ключа
+            task.wait(0.1)
+            
+            -- ВМЕСТО DESTROY ПРОСТО СКРЫВАЕМ ОКНО
+            gui.Enabled = false 
+            
         else
             st.TextColor3 = WindUI.Danger; st.Text = "Ошибка: " .. tostring(msg)
         end
@@ -347,7 +350,7 @@ local function doFling()
     end
 end
 
--- ===== ПОЛЕТ И NOCLIP (ИСПРАВЛЕНО ОТ ВЫЛЕТОВ) =====
+-- ===== ПОЛЕТ И NOCLIP =====
 local function ensureFly()
     local char = LP.Character
     if not char then return end
@@ -414,9 +417,9 @@ local function startFarm(counterLabel, statusLabel)
     task.spawn(function()
         while running do
             if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then
-                task.wait(1) -- Ждем респавна
+                task.wait(1)
             else
-                ensureFly() -- Проверяем полет (восстановит после смерти)
+                ensureFly()
                 local target = getClosestItem()
                 currentTarget = target
                 if target then
@@ -450,6 +453,16 @@ end
 
 -- Анти-AFK
 LP.Idled:Connect(function() VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new()) end)
+
+-- ===== КОМАНДА ДЛЯ СМЕНЫ КЛЮЧА =====
+LP.Chatted:Connect(function(msg)
+    if msg:lower() == "/key" then
+        local keyGui = LP.PlayerGui:FindFirstChild("KeyGui")
+        if keyGui then
+            keyGui.Enabled = not keyGui.Enabled -- Включает/выключает окно ключа
+        end
+    end
+end)
 
 -- ===== ЗАПУСК =====
 promptKey(function()
