@@ -1,4 +1,4 @@
--- MM2 Candy Autofarm + WindUI + Fling + Auto-Search
+-- MM2 Candy Autofarm + Simple GUI + Fling + Auto-Search
 -- Автор: TGK @BaysentaScript
 -- Исполнитель: Delta / Fluxus / Arceus X / Synapse / KRNL
 
@@ -16,150 +16,14 @@ local CONFIG = {
     loopDelay  = 0.05,       
     touchWait  = 0.1,        
     itemFilter = {"Candy", "Treat", "Coin", "Gift"}, 
-    flySpeed   = 75,         -- Базовая скорость (меняется слайдером)
+    flySpeed   = 75,         
     noClip     = true,
     maxCandy   = 50,         
     enableFling= true        
 }
 -- =========================================================
 
--- ===== КРАСИВЫЙ WINDUI СТИЛЬ =====
-local WindUI = {
-    BgColor     = Color3.fromRGB(18, 18, 20),
-    BgTrans     = 0.05,
-    StrokeColor = Color3.fromRGB(45, 45, 50),
-    TextColor   = Color3.fromRGB(240, 240, 240),
-    Accent      = Color3.fromRGB(155, 225, 93), 
-    Danger      = Color3.fromRGB(255, 80, 80),
-    Font        = Enum.Font.GothamMedium,
-    FontBold    = Enum.Font.GothamBold,
-    
-    CreateWindow = function(titleText)
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "MM2_WindUI"; gui.ResetOnSpawn = false
-        gui.DisplayOrder = 20
-        gui.Parent = LP:WaitForChild("PlayerGui")
-        
-        local main = Instance.new("Frame")
-        main.Size = UDim2.new(0, 280, 0, 240); main.Position = UDim2.new(0, 20, 0, 20)
-        main.BackgroundColor3 = WindUI.BgColor; main.BackgroundTransparency = WindUI.BgTrans
-        main.BorderSizePixel = 0; main.Active = true; main.Parent = gui
-        Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
-        
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = WindUI.StrokeColor; stroke.Thickness = 1.5; stroke.Parent = main
-
-        local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1, -40, 0, 25); title.Position = UDim2.new(0, 20, 0, 10)
-        title.BackgroundTransparency = 1; title.Text = titleText
-        title.TextColor3 = WindUI.TextColor; title.Font = WindUI.FontBold; title.TextSize = 16
-        title.TextXAlignment = Enum.TextXAlignment.Left; title.Parent = main
-        
-        local tgTag = Instance.new("TextLabel")
-        tgTag.Size = UDim2.new(1, -40, 0, 15); tgTag.Position = UDim2.new(0, 20, 0, 32)
-        tgTag.BackgroundTransparency = 1; tgTag.Text = "TGK: @BaysentaScript"
-        tgTag.TextColor3 = Color3.fromRGB(120, 180, 255)
-        tgTag.Font = WindUI.Font; tgTag.TextSize = 12
-        tgTag.TextXAlignment = Enum.TextXAlignment.Left; tgTag.Parent = main
-        
-        local sep = Instance.new("Frame")
-        sep.Size = UDim2.new(1, -40, 0, 1); sep.Position = UDim2.new(0, 20, 0, 55)
-        sep.BackgroundColor3 = WindUI.StrokeColor; sep.BorderSizePixel = 0; sep.Parent = main
-
-        -- Перетаскивание
-        local dragging, dragInput, dragStart, startPos
-        main.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true; dragStart = input.Position; startPos = main.Position
-                input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then dragging = false end
-                end)
-            end
-        end)
-        main.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-                dragInput = input
-            end
-        end)
-        UIS.InputChanged:Connect(function(input)
-            if input == dragInput and dragging then
-                local delta = input.Position - dragStart
-                main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            end
-        end)
-        
-        return main
-    end,
-    
-    CreateButton = function(parent, text, isDanger)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.5, -10, 0, 35); btn.BackgroundColor3 = isDanger and WindUI.Danger or WindUI.Accent
-        btn.TextColor3 = isDanger and WindUI.TextColor or Color3.fromRGB(20, 20, 20)
-        btn.Font = WindUI.FontBold; btn.TextSize = 14; btn.Text = text; btn.BorderSizePixel = 0
-        btn.AutoButtonColor = false; btn.Parent = parent
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-        
-        btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = isDanger and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(180, 245, 120)}):Play()
-        end)
-        btn.MouseLeave:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = isDanger and WindUI.Danger or WindUI.Accent}):Play()
-        end)
-        return btn
-    end,
-    
-    CreateSlider = function(parent, text, min, max, default, callback)
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, -40, 0, 45); frame.BackgroundTransparency = 1; frame.Parent = parent
-        
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 0, 20); label.BackgroundTransparency = 1
-        label.Text = text .. ": " .. default; label.TextColor3 = WindUI.TextColor
-        label.Font = WindUI.Font; label.TextSize = 13; label.TextXAlignment = Enum.TextXAlignment.Left; label.Parent = frame
-        
-        local bar = Instance.new("Frame")
-        bar.Size = UDim2.new(1, 0, 0, 6); bar.Position = UDim2.new(0, 0, 0, 28)
-        bar.BackgroundColor3 = WindUI.StrokeColor; bar.BorderSizePixel = 0; bar.Parent = frame
-        Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
-        
-        local fill = Instance.new("Frame")
-        fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-        fill.BackgroundColor3 = WindUI.Accent; fill.BorderSizePixel = 0; fill.Parent = bar
-        Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
-        
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundTransparency = 1; btn.Text = ""; btn.Parent = bar
-        
-        local dragging = false
-        local function update(input)
-            local pos = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
-            local value = math.floor(min + (max - min) * pos)
-            fill.Size = UDim2.new(pos, 0, 1, 0)
-            label.Text = text .. ": " .. value
-            callback(value)
-        end
-        
-        btn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true; update(input)
-            end
-        end)
-        UIS.InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                update(input)
-            end
-        end)
-        UIS.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-        
-        return frame
-    end
-}
-
--- ===== KEY CHECK (ОБНОВЛЕНО) =====
+-- ===== KEY CHECK =====
 local function checkKey(key)
     key = tostring(key or ""):gsub("^%s*(.-)%s*$", "%1")
 
@@ -167,7 +31,6 @@ local function checkKey(key)
         return false, "Введите ключ"
     end
 
-    -- Перехватываем 3 значения: статус pcall, и два возвращаемых значения (boolean и текст)
     local success, isValid, errorMsg = pcall(function()
         local response = HttpService:RequestAsync({
             Url = CONFIG.checkURL,
@@ -210,7 +73,6 @@ local function checkKey(key)
         return false, "Ошибка соединения или ответа сервера"
     end
 
-    -- Возвращаем оба значения: статус (true/false) и текст (OK / причина ошибки)
     return isValid, errorMsg
 end
 
@@ -222,33 +84,33 @@ local function promptKey(callback)
     
     local f = Instance.new("Frame")
     f.Size = UDim2.new(0, 300, 0, 180); f.Position = UDim2.new(0.5, -150, 0.5, -90)
-    f.BackgroundColor3 = WindUI.BgColor; f.BorderSizePixel = 0; f.Parent = gui
+    f.BackgroundColor3 = Color3.fromRGB(25, 25, 28); f.BorderSizePixel = 0; f.Parent = gui
     Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
-    local stroke = Instance.new("UIStroke"); stroke.Color = WindUI.StrokeColor; stroke.Parent = f
+    local stroke = Instance.new("UIStroke"); stroke.Color = Color3.fromRGB(45, 45, 50); stroke.Parent = f
 
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 25); title.Position = UDim2.new(0, 0, 0, 15)
     title.BackgroundTransparency = 1; title.Text = "АВТОРИЗАЦИЯ"
-    title.TextColor3 = WindUI.Accent; title.Font = WindUI.FontBold; title.TextSize = 16; title.Parent = f
+    title.TextColor3 = Color3.fromRGB(155, 225, 93); title.Font = Enum.Font.GothamBold; title.TextSize = 16; title.Parent = f
 
     local tgTag = Instance.new("TextLabel")
     tgTag.Size = UDim2.new(1, 0, 0, 15); tgTag.Position = UDim2.new(0, 0, 0, 35)
     tgTag.BackgroundTransparency = 1; tgTag.Text = "TGK: @BaysentaScript"
-    tgTag.TextColor3 = Color3.fromRGB(120, 180, 255); tgTag.Font = WindUI.Font; tgTag.TextSize = 12; tgTag.Parent = f
+    tgTag.TextColor3 = Color3.fromRGB(120, 180, 255); tgTag.Font = Enum.Font.Gotham; tgTag.TextSize = 12; tgTag.Parent = f
 
     local box = Instance.new("TextBox")
     box.Size = UDim2.new(0, 260, 0, 35); box.Position = UDim2.new(0, 20, 0, 60)
     box.PlaceholderText = "Введите ключ..."; box.Text = ""; box.ClearTextOnFocus = false
-    box.TextSize = 14; box.BackgroundColor3 = Color3.fromRGB(30, 30, 35); box.TextColor3 = WindUI.TextColor
-    box.Font = WindUI.Font; box.BorderSizePixel = 0; box.Parent = f
+    box.TextSize = 14; box.BackgroundColor3 = Color3.fromRGB(40, 40, 45); box.TextColor3 = Color3.fromRGB(240, 240, 240)
+    box.Font = Enum.Font.Gotham; box.BorderSizePixel = 0; box.Parent = f
     Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
 
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 260, 0, 35) 
     btn.Position = UDim2.new(0, 20, 0, 110)
-    btn.BackgroundColor3 = WindUI.Accent
+    btn.BackgroundColor3 = Color3.fromRGB(155, 225, 93)
     btn.TextColor3 = Color3.fromRGB(20, 20, 20)
-    btn.Font = WindUI.FontBold; btn.TextSize = 14; btn.Text = "Проверить"
+    btn.Font = Enum.Font.GothamBold; btn.TextSize = 14; btn.Text = "Проверить"
     btn.BorderSizePixel = 0; btn.AutoButtonColor = false; btn.Parent = f
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
@@ -256,18 +118,18 @@ local function promptKey(callback)
         TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(180, 245, 120)}):Play()
     end)
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = WindUI.Accent}):Play()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(155, 225, 93)}):Play()
     end)
 
     local st = Instance.new("TextLabel")
     st.Size = UDim2.new(0, 260, 0, 20); st.Position = UDim2.new(0, 20, 0, 150)
-    st.BackgroundTransparency = 1; st.TextColor3 = WindUI.Danger; st.TextSize = 12; st.Font = WindUI.Font; st.Text = ""; st.Parent = f
+    st.BackgroundTransparency = 1; st.TextColor3 = Color3.fromRGB(255, 90, 90); st.TextSize = 12; st.Font = Enum.Font.Gotham; st.Text = ""; st.Parent = f
 
     btn.MouseButton1Click:Connect(function()
         st.TextColor3 = Color3.fromRGB(200, 200, 200); st.Text = "Проверка..."
         local ok, msg = checkKey(box.Text)
         if ok then
-            st.TextColor3 = WindUI.Accent; st.Text = "Успешно!"
+            st.TextColor3 = Color3.fromRGB(155, 225, 93); st.Text = "Успешно!"
             task.wait(0.3)
             
             callback() -- Создаем главное окно
@@ -275,39 +137,68 @@ local function promptKey(callback)
             
             gui.Enabled = false -- Скрываем окно ключа
         else
-            st.TextColor3 = WindUI.Danger; st.Text = "Ошибка: " .. tostring(msg)
+            st.TextColor3 = Color3.fromRGB(255, 90, 90); st.Text = "Ошибка: " .. tostring(msg)
         end
     end)
 end
 
--- ===== ГЛАВНОЕ ОКНО =====
+-- ===== ГЛАВНОЕ ОКНО (ПРОСТАЯ GUI) =====
 local function createMainGUI()
-    local main = WindUI.CreateWindow("MM2 FARM | WindUI")
-    
-    local status = Instance.new("TextLabel")
-    status.Size = UDim2.new(1, -40, 0, 20); status.Position = UDim2.new(0, 20, 0, 65)
-    status.BackgroundTransparency = 1; status.Text = "Статус: Ожидание"
-    status.TextColor3 = WindUI.TextColor; status.Font = WindUI.Font; status.TextSize = 13
-    status.TextXAlignment = Enum.TextXAlignment.Left; status.Parent = main
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "MM2Farm_GUI"; gui.ResetOnSpawn = false; gui.Parent = LP:WaitForChild("PlayerGui")
+    gui.DisplayOrder = 20
+
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(0, 260, 0, 160); f.Position = UDim2.new(0, 20, 0, 20)
+    f.BackgroundColor3 = Color3.fromRGB(25, 25, 28); f.BorderSizePixel = 0
+    f.Active = true; f.Parent = gui
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
+
+    -- Перетаскивание
+    local dragging, dragInput, dragStart, startPos
+    f.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = f.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    f.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            f.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 30); title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1; title.Text = "MM2 Farm | @BaysentaScript"
+    title.TextColor3 = Color3.fromRGB(155, 225, 93); title.Font = Enum.Font.GothamBold; title.TextSize = 15; title.Parent = f
 
     local counter = Instance.new("TextLabel")
-    counter.Size = UDim2.new(1, -40, 0, 20); counter.Position = UDim2.new(0, 20, 0, 85)
-    counter.BackgroundTransparency = 1; counter.Text = "Собрано: 0"
-    counter.TextColor3 = WindUI.Accent; counter.Font = WindUI.FontBold; counter.TextSize = 14
-    counter.TextXAlignment = Enum.TextXAlignment.Left; counter.Parent = main
+    counter.Size = UDim2.new(1, 0, 0, 30); counter.Position = UDim2.new(0, 0, 0, 40)
+    counter.BackgroundTransparency = 1; counter.Text = "Собрано конфет: 0"
+    counter.TextColor3 = Color3.fromRGB(240, 240, 240); counter.Font = Enum.Font.Gotham; counter.TextSize = 15; counter.Parent = f
 
-    local slider = WindUI.CreateSlider(main, "Скорость полета", 30, 120, CONFIG.flySpeed, function(val)
-        CONFIG.flySpeed = val
-    end)
-    slider.Position = UDim2.new(0, 20, 0, 110)
+    local btnStart = Instance.new("TextButton")
+    btnStart.Size = UDim2.new(0, 110, 0, 30); btnStart.Position = UDim2.new(0, 20, 0, 100)
+    btnStart.Text = "Старт"; btnStart.Font = Enum.Font.GothamBold; btnStart.TextSize = 14
+    btnStart.BackgroundColor3 = Color3.fromRGB(155, 225, 93); btnStart.TextColor3 = Color3.fromRGB(20, 20, 20); btnStart.Parent = f
+    Instance.new("UICorner", btnStart).CornerRadius = UDim.new(0, 4)
 
-    local btnStart = WindUI.CreateButton(main, "Старт", false)
-    btnStart.Position = UDim2.new(0, 20, 0, 180)
-    
-    local btnStop = WindUI.CreateButton(main, "Стоп", true)
-    btnStop.Position = UDim2.new(0, 150, 0, 180)
+    local btnStop = Instance.new("TextButton")
+    btnStop.Size = UDim2.new(0, 110, 0, 30); btnStop.Position = UDim2.new(0, 130, 0, 100)
+    btnStop.Text = "Стоп"; btnStop.Font = Enum.Font.GothamBold; btnStop.TextSize = 14
+    btnStop.BackgroundColor3 = Color3.fromRGB(255, 90, 90); btnStop.TextColor3 = Color3.fromRGB(20, 20, 20); btnStop.Parent = f
+    Instance.new("UICorner", btnStop).CornerRadius = UDim.new(0, 4)
 
-    return main, counter, status, btnStart, btnStop
+    return f, counter, btnStart, btnStop
 end
 
 -- ===== ФИЗИКА И ПОИСК =====
@@ -442,11 +333,9 @@ local function disableNoClip()
 end
 
 -- ===== ЦИКЛ ФАРМА =====
-local function startFarm(counterLabel, statusLabel)
+local function startFarm(counterLabel)
     if running then return end
     running = true
-    statusLabel.Text = "Статус: Работает"
-    statusLabel.TextColor3 = WindUI.Accent
     local count = 0
     enableNoClip()
 
@@ -468,7 +357,7 @@ local function startFarm(counterLabel, statusLabel)
                     end
                     if running then
                         count = count + 1
-                        counterLabel.Text = "Собрано: " .. count
+                        counterLabel.Text = "Собрано конфет: " .. count
                         if CONFIG.enableFling and count >= CONFIG.maxCandy then doFling(); count = 0 end
                     end
                     task.wait(CONFIG.touchWait) 
@@ -481,10 +370,8 @@ local function startFarm(counterLabel, statusLabel)
     end)
 end
 
-local function stopFarm(statusLabel)
+local function stopFarm()
     running = false; currentTarget = nil; stopFly(); disableNoClip()
-    statusLabel.Text = "Статус: Остановлен"
-    statusLabel.TextColor3 = WindUI.Danger
 end
 
 -- Анти-AFK
@@ -502,7 +389,7 @@ end)
 
 -- ===== ЗАПУСК =====
 promptKey(function()
-    local main, counter, status, btnStart, btnStop = createMainGUI()
-    btnStart.MouseButton1Click:Connect(function() if not running then startFarm(counter, status) end end)
-    btnStop.MouseButton1Click:Connect(function() stopFarm(status) end)
+    local main, counter, btnStart, btnStop = createMainGUI()
+    btnStart.MouseButton1Click:Connect(function() if not running then startFarm(counter) end end)
+    btnStop.MouseButton1Click:Connect(function() stopFarm() end)
 end)
