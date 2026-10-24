@@ -1,4 +1,4 @@
--- MM2 Candy Autofarm + Key System + GUI + Fly/NoClip (Optimized)
+-- MM2 Candy Autofarm + Key System + GUI + Fly/NoClip + Fling
 -- Исполнитель: Delta / Fluxus / Arceus X / Synapse / KRNL
 
 local Players     = game:GetService("Players")
@@ -11,11 +11,15 @@ local LP          = Players.LocalPlayer
 -- ================= НАСТРОЙКИ =================
 local CONFIG = {
     checkURL   = "https://nbpanel-api.onrender.com/v1/licenses/verify",
-    loopDelay  = 0.2,        -- Пауза между поисками цели
-    touchWait  = 0.25,       -- Пауза после подлета (чтобы сервер засчитал касание)
+    loopDelay  = 0.2,        
+    touchWait  = 0.3,       
     itemFilter = {"Candy", "Treat", "Coin", "Gift"}, 
-    flySpeed   = 50,         -- Скорость полета
-    noClip     = true        -- Проходить сквозь стены
+    flySpeed   = 50,         
+    noClip     = true,
+    
+    -- НАСТРОЙКИ ФЛИНГА
+    maxCandy   = 50,         -- Сколько конфет собрать до флинга (замени на свой лимит мешка)
+    enableFling= true        -- Включить/выключить флинг
 }
 -- ==============================================
 
@@ -115,7 +119,7 @@ local function createMainGUI()
 
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 30); title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundTransparency = 1; title.Text = "MM2 Farm [v1.2]"
+    title.BackgroundTransparency = 1; title.Text = "MM2 Farm [v1.3]"
     title.TextColor3 = Color3.fromRGB(155, 225, 93); title.Font = Enum.Font.GothamBold; title.TextSize = 16; title.Parent = f
 
     local counter = Instance.new("TextLabel")
@@ -143,22 +147,92 @@ local running = false
 local currentTarget = nil
 local flyBV, flyConn, noclipConn = nil, nil, nil
 
+-- Ищем объекты. Теперь учитываем модели и проверяем Position с Handle.
 local function getClosestItem()
     local h = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
     if not h then return nil end
     local closest, shortestDist = nil, math.huge
+    
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("Tool") then
+        if obj:IsA("BasePart") or obj:IsA("Tool") or obj:IsA("Model") then
             for _, name in ipairs(CONFIG.itemFilter) do
                 if obj.Name:lower():find(name:lower()) then
-                    local dist = (h.Position - obj.Position).Magnitude
-                    if dist < shortestDist then shortestDist = dist; closest = obj end
+                    -- Находим реальную 3D точку (если это модель, берем главную часть или хэндл)
+                    local pos
+                    if obj:IsA("Model") then
+                        if obj.PrimaryPart then pos = obj.PrimaryPart.Position
+                        elseif obj:FindFirstChild("Handle") then pos = obj.Handle.Position
+                        else
+                            local parts = obj:GetDescendants()
+                            for _, p in ipairs(parts) do if p:IsA("BasePart") then pos = p.Position; break end end
+                        end
+                    elseif obj:IsA("BasePart") then pos = obj.Position
+                    elseif obj:IsA("Tool") and obj:FindFirstChild("Handle") then pos = obj.Handle.Position end
+
+                    if pos then
+                        local dist = (h.Position - pos).Magnitude
+                        if dist < shortestDist then 
+                            shortestDist = dist
+                            closest = obj 
+                        end
+                    end
                     break
                 end
             end
         end
     end
     return closest
+end
+
+-- Получить позицию цели (универсально)
+local function getTargetPos(target)
+    if not target then return nil end
+    if target:IsA("Model") then
+        if target.PrimaryPart then return target.PrimaryPart.Position end
+        if target:FindFirstChild("Handle") then return target.Handle.Position end
+        for _, p in ipairs(target:GetDescendants()) do if p:IsA("BasePart") then return p.Position end end
+    elseif target:IsA("Tool") and target:FindFirstChild("Handle") then
+        return target.Handle.Position
+    elseif target:IsA("BasePart") then
+        return target.Position
+    end
+    return nil
+end
+
+-- ===== ФЛИНГ (РАЗБРАСЫВАНИЕ) =====
+local function doFling()
+    local char = LP.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- Ищем других игроков поблизости
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LP and player.Character then
+            local targetHrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local targetHum = player.Character:FindFirstChild("Humanoid")
+            if targetHrp and targetHum and targetHum.Health > 0 then
+                local dist = (hrp.Position - targetHrp.Position).Magnitude
+                if dist < 30 then -- Если игрок в радиусе 30 стадов
+                    -- Физический пинок
+                    local bv = Instance.new("BodyAngularVelocity")
+                    bv.AngularVelocity = Vector3.new(9999, 9999, 9999)
+                    bv.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                    bv.Parent = targetHrp
+                    
+                    local bv2 = Instance.new("BodyVelocity")
+                    bv2.Velocity = Vector3.new(0, 500, 0) -- Подкидываем вверх
+                    bv2.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                    bv2.Parent = targetHrp
+                    
+                    task.delay(0.5, function()
+                        if bv then bv:Destroy() end
+                        if bv2 then bv2:Destroy() end
+                    end)
+                end
+            end
+        end
+    end
 end
 
 local function ensureFly()
@@ -179,22 +253,23 @@ local function ensureFly()
             if flyBV then flyBV.Velocity = Vector3.zero end
             return
         end
-        local target = currentTarget
+        
+        local pos = getTargetPos(currentTarget)
         local char2 = LP.Character
         local h = char2 and char2:FindFirstChild("HumanoidRootPart")
         
-        if not h or not target or not target.Parent then
+        if not h or not pos then
             flyBV.Velocity = Vector3.zero
             return
         end
         
-        local diff = target.Position - h.Position
+        local diff = pos - h.Position
         local dist = diff.Magnitude
         
-        if dist < 3.5 then
+        -- Останавливаемся на расстоянии 2 стада, чтобы точно задеть хитбоксом
+        if dist < 2 then
             flyBV.Velocity = Vector3.zero
         else
-            -- Плавное торможение у цели
             local speed = math.min(CONFIG.flySpeed, dist * 5)
             flyBV.Velocity = diff.Unit * speed
         end
@@ -245,12 +320,14 @@ local function startFarm(counterLabel)
             currentTarget = target
             
             if target then
-                -- Ждём подлёта
                 local t0 = tick()
                 while running and target and target.Parent do
                     local h = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-                    if not h then break end
-                    if (h.Position - target.Position).Magnitude < 3.5 then break end
+                    local pos = getTargetPos(target)
+                    if not h or not pos then break end
+                    
+                    -- Если подлетели ближе 2.5 стадов — хватит
+                    if (h.Position - pos).Magnitude < 2.5 then break end
                     if tick() - t0 > 3 then break end
                     task.wait(0.05)
                 end
@@ -258,8 +335,14 @@ local function startFarm(counterLabel)
                 if running then
                     count = count + 1
                     if counterLabel then counterLabel.Text = "Собрано конфет: " .. count end
+                    
+                    -- === FLING ПРИ ЗАПОЛНЕНИИ МЕШКА ===
+                    if CONFIG.enableFling and count >= CONFIG.maxCandy then
+                        doFling() -- Вызываем флинг
+                        count = 0  -- Сбрасываем счетчик (если конфеты сбрасываются)
+                    end
                 end
-                task.wait(CONFIG.touchWait) -- Даем серверу время засчитать
+                task.wait(CONFIG.touchWait) 
             else
                 task.wait(0.6)
             end
