@@ -1,4 +1,4 @@
- -- MM2 Candy Autofarm + WindUI + Fling + Auto-Search
+-- MM2 Candy Autofarm + WindUI + Fling + Auto-Search
 -- Автор: TGK @BaysentaScript
 -- Исполнитель: Delta / Fluxus / Arceus X / Synapse / KRNL
 
@@ -159,24 +159,62 @@ local WindUI = {
     end
 }
 
--- ===== KEY CHECK (FastAPI) =====
+-- ===== KEY CHECK (ОБНОВЛЕНО) =====
 local function checkKey(key)
-    if not key or key == "" then return false, "Введите ключ" end
-    local body = HttpService:JSONEncode({ key = key })
-    local ok, response = pcall(function()
-        local reqFunc = (syn and syn.request) or (http and http.request) or request
-        if reqFunc then
-            return reqFunc({ Url = CONFIG.checkURL, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = body })
-        else
-            return { StatusCode = 200, Body = game:HttpPost(CONFIG.checkURL, body, "application/json") }
+    key = tostring(key or ""):gsub("^%s*(.-)%s*$", "%1")
+
+    if key == "" then
+        return false, "Введите ключ"
+    end
+
+    -- Перехватываем 3 значения: статус pcall, и два возвращаемых значения (boolean и текст)
+    local success, isValid, errorMsg = pcall(function()
+        local response = HttpService:RequestAsync({
+            Url = CONFIG.checkURL,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode({
+                key = key
+            })
+        })
+
+        if not response.Success then
+            return false, "HTTP " .. tostring(response.StatusCode)
         end
+
+        local data = HttpService:JSONDecode(response.Body)
+
+        if type(data) ~= "table" then
+            return false, "Некорректный ответ сервера"
+        end
+
+        if data.valid == true and data.status == "active" then
+            return true, "OK"
+        end
+
+        if data.status == "expired" then
+            return false, "Срок действия ключа истёк"
+        elseif data.status == "revoked" then
+            return false, "Ключ отозван"
+        elseif data.status == "invalid" then
+            return false, "Неверный ключ"
+        end
+
+        return false, "Не удалось подтвердить ключ"
     end)
-    if not ok or not response then return false, "Сервер недоступен" end
-    if response.StatusCode ~= 200 then return false, "Неверный ключ (Код: " .. tostring(response.StatusCode) .. ")" end
-    return true, "OK"
+
+    if not success then
+        warn("Ошибка проверки лицензии:", isValid)
+        return false, "Ошибка соединения или ответа сервера"
+    end
+
+    -- Возвращаем оба значения: статус (true/false) и текст (OK / причина ошибки)
+    return isValid, errorMsg
 end
 
--- ===== ОКНО КЛЮЧА (БЕЗ DESTROY) =====
+-- ===== ОКНО КЛЮЧА =====
 local function promptKey(callback)
     local gui = Instance.new("ScreenGui")
     gui.Name = "KeyGui"; gui.ResetOnSpawn = false; gui.DisplayOrder = 10
@@ -235,9 +273,7 @@ local function promptKey(callback)
             callback() -- Создаем главное окно
             task.wait(0.1)
             
-            -- ВМЕСТО DESTROY ПРОСТО СКРЫВАЕМ ОКНО
-            gui.Enabled = false 
-            
+            gui.Enabled = false -- Скрываем окно ключа
         else
             st.TextColor3 = WindUI.Danger; st.Text = "Ошибка: " .. tostring(msg)
         end
@@ -459,7 +495,7 @@ LP.Chatted:Connect(function(msg)
     if msg:lower() == "/key" then
         local keyGui = LP.PlayerGui:FindFirstChild("KeyGui")
         if keyGui then
-            keyGui.Enabled = not keyGui.Enabled -- Включает/выключает окно ключа
+            keyGui.Enabled = not keyGui.Enabled 
         end
     end
 end)
